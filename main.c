@@ -6,15 +6,21 @@
 #include "msp.h"
 #include "uart.h"
 #include "clock.h"
+#include <stdio.h>
 
 #define TRIG_DUR 600
 #define FRAME_DUR 60000 //100Hz new data
+#define FRAME_FREQ 6000000
+#define SOUNDSPEED 343
 
 void timer_init(void);
 void pin_init(void);
+void util_uart_print_distance(uint32_t number);
 
 uint8_t received = 0;
 uint16_t framecycles;
+uint32_t distance;  //in micrometers
+char str[80];
 
 void main(void)
 {
@@ -27,15 +33,34 @@ void main(void)
 
     //Printing to terminal
     UART_print_string("Distance:");
+
     while(1)
     {
-        if(received = 1)    //calculate distance
+        if(received == 1)    //calculate distance
         {
+
             received = 0;
             //calculate distance below
+            distance = SOUNDSPEED*framecycles/FRAME_FREQ*1000000;
+            UART_esc_code(CLEAR_LINE);
+            UART_esc_code(RESET_CURSOR);
+            UART_print_string("Distance:");
+            util_uart_print_distance(distance);
+            UART_print_string("m");
         }
     }
 }
+
+//Input in micrometers
+void util_uart_print_distance(uint32_t number)
+{
+    UART_send_data(number/(1000000)+ASCII_NUM_OFFSET);
+    UART_send_data(DECIMAL);
+    UART_send_data((number/(100000))%10+ASCII_NUM_OFFSET);
+    UART_send_data((number/(10000))%10+ASCII_NUM_OFFSET);
+    UART_send_data((number/(1000))%10+ASCII_NUM_OFFSET);
+}
+
 
 void pin_init(void)
 {
@@ -58,8 +83,11 @@ void pin_init(void)
 void PORT3_IRQHandler(void)
 {
     P3->IFG &= ~BIT7;   //clear flag
-    framecycles = TIMER_A1->R;  //record cycles for distance measurement
-    received = 1;
+    if(received != 1)
+    {
+        framecycles = TIMER_A1->R;  //record cycles for distance measurement
+        received = 1;
+    }
 }
 
 void TA0_0_IRQHandler(void)
