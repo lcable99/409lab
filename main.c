@@ -17,9 +17,9 @@ void timer_init(void);
 void pin_init(void);
 void util_uart_print_distance(uint32_t number);
 
-uint8_t received = 0;
-uint16_t framecycles;
-uint32_t distance;  //in micrometers
+volatile uint8_t received = 0;
+volatile uint16_t framecycles;
+uint32_t distance;  //in millimeters
 char str[80];
 
 void main(void)
@@ -41,7 +41,7 @@ void main(void)
 
             received = 0;
             //calculate distance below
-            distance = SOUNDSPEED*framecycles/FRAME_FREQ*1000000;
+            distance = SOUNDSPEED*framecycles/FRAME_FREQ*1000;
             UART_esc_code(CLEAR_LINE);
             UART_esc_code(RESET_CURSOR);
             UART_print_string("Distance:");
@@ -54,11 +54,11 @@ void main(void)
 //Input in micrometers
 void util_uart_print_distance(uint32_t number)
 {
-    UART_send_data(number/(1000000)+ASCII_NUM_OFFSET);
+    UART_send_data(number/(1000)+ASCII_NUM_OFFSET);
     UART_send_data(DECIMAL);
-    UART_send_data((number/(100000))%10+ASCII_NUM_OFFSET);
-    UART_send_data((number/(10000))%10+ASCII_NUM_OFFSET);
-    UART_send_data((number/(1000))%10+ASCII_NUM_OFFSET);
+    UART_send_data((number/(100))%10+ASCII_NUM_OFFSET);
+    UART_send_data((number/(10))%10+ASCII_NUM_OFFSET);
+    UART_send_data((number/(1))%10+ASCII_NUM_OFFSET);
 }
 
 
@@ -80,6 +80,7 @@ void pin_init(void)
     NVIC->ISER[1] = BIT5;  //enable P3 interrupt ISR
 }
 
+//Received signal interrupt
 void PORT3_IRQHandler(void)
 {
     P3->IFG &= ~BIT7;   //clear flag
@@ -90,6 +91,7 @@ void PORT3_IRQHandler(void)
     }
 }
 
+//oneshot interrupt
 void TA0_0_IRQHandler(void)
 {
     TIMER_A0->CCTL[0] &= ~TIMER_A_CCTLN_CCIFG;  //clear flag
@@ -97,10 +99,11 @@ void TA0_0_IRQHandler(void)
     TIMER_A0 -> CCR[0] = 0;
 }
 
+//repeat frame every 100Hz
 void TA1_0_IRQHandler(void)
 {
     TIMER_A1->CCTL[0] &= ~TIMER_A_CCTLN_CCIFG;  //clear flag
-    TIMER_A0 -> CCR[0] = TRIG_DUR-1;
+    TIMER_A0 -> CCR[0] = TRIG_DUR-1;    //start oneshot
     P2->OUT &= ~BIT7;   //set low
 }
 
